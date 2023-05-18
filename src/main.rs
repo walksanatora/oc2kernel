@@ -12,7 +12,7 @@ static mut HEAP_BITMAP: PageAligned<[u8; 512]> = heap_bitmap!();
 static ALLOCATOR: GlobalChunkAllocator =
     unsafe { GlobalChunkAllocator::new(HEAP.deref_mut_const(), HEAP_BITMAP.deref_mut_const()) };
 
-use core::panic::PanicInfo;
+use core::{panic::PanicInfo, ptr::write_volatile};
 
 #[naked]
 #[no_mangle]
@@ -20,32 +20,43 @@ use core::panic::PanicInfo;
 unsafe extern "C" fn _start() -> ! {
     use core::arch::asm;
     asm!(
-      // before we use the `la` pseudo-instruction for the first time,
-      //  we need to set `gp` (google linker relaxation)
-      ".option push",
-      ".option norelax",
-      "la gp, _global_pointer",
-      ".option pop",
+        // before we use the `la` pseudo-instruction for the first time,
+        //  we need to set `gp` (google linker relaxation)
+        ".option push",
+        ".option norelax",
+        "la gp, _global_pointer",
+        ".option pop",
 
-      // set the stack pointer
-      "la sp, _init_stack_top",
+        // set the stack pointer
+        "la sp, _init_stack_top",
 
-      "lla     t0, _bss_start",
-      "lla     t1, _bss_end",
-      "0:",
-      "sb      zero, (t0)",
-      "addi    t0, t0, 1",
-      "bltu    t0, t1, 0b",
+        "lla     t0, _bss_start",
+        "lla     t1, _bss_end",
+    "0:  bgeu    t0, t1, 1f",
+        "sb      zero, (t0)",
+        "addi    t0, t0, 1",
+        "j       0b",
+    "1:",
 
-      // "tail-call" to {entry} (call without saving a return address)
-      "tail {entry}",
-      entry = sym entry, // {entry} refers to the function [entry] below
-      options(noreturn) // we must handle "returning" from assembly
-    );
+        // "tail-call" to {entry} (call without saving a return address)
+        "tail {entry}",
+        entry = sym entry, // {entry} refers to the function [entry] below
+        options(noreturn) // we must handle "returning" from assembly
+      );
 }
 
 extern "C" fn entry(_hard_id: u64, fdt_ptr: *const u8) -> ! {
     unsafe {
+        //UART setup
+        let addr = 0x1000_0148 as *mut u8; // UART address
+
+        // Set data size to 8 bits.
+        write_volatile(addr.offset(3), 0b11);
+        // Enable FIFO.
+        write_volatile(addr.offset(2), 0b1);
+        // Enable receiver buffer interrupts.
+        write_volatile(addr.offset(1), 0b1);
+        println!("hello!");
         let dev_tree = fdt::Fdt::from_ptr(fdt_ptr).unwrap();
         println!("Hello, World");
         println!("cpu count: {:?}", dev_tree.cpus().count());
