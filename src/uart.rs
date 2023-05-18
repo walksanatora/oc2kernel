@@ -1,11 +1,11 @@
+use crate::UART_BASE;
+
 pub struct Uart {}
 impl core::fmt::Write for Uart {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        let uart_out = 0x1000_0148 as *mut u8;
-
         for c in s.bytes() {
             unsafe {
-                uart_out.write_volatile(c);
+                UART_BASE.write_volatile(c);
             }
         }
 

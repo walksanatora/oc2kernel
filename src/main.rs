@@ -14,6 +14,8 @@ static ALLOCATOR: GlobalChunkAllocator =
 
 use core::{panic::PanicInfo, ptr::write_volatile};
 
+static mut UART_BASE: *mut u8 = 0x1000_0148 as *mut u8;
+
 #[naked]
 #[no_mangle]
 #[link_section = ".text.init"]
@@ -47,17 +49,29 @@ unsafe extern "C" fn _start() -> ! {
 
 extern "C" fn entry(_hard_id: u64, fdt_ptr: *const u8) -> ! {
     unsafe {
-        //UART setup
-        let addr = 0x1000_0148 as *mut u8; // UART address
+        //#region UART setup
+        let dev_tree = fdt::Fdt::from_ptr(fdt_ptr).unwrap();
+
+        UART_BASE = dev_tree
+            .chosen()
+            .stdout()
+            .unwrap()
+            .reg()
+            .unwrap()
+            .next()
+            .unwrap()
+            .starting_address
+            .cast_mut();
 
         // Set data size to 8 bits.
-        write_volatile(addr.offset(3), 0b11);
+        write_volatile(UART_BASE.offset(3), 0b11);
         // Enable FIFO.
-        write_volatile(addr.offset(2), 0b1);
+        write_volatile(UART_BASE.offset(2), 0b1);
         // Enable receiver buffer interrupts.
-        write_volatile(addr.offset(1), 0b1);
+        write_volatile(UART_BASE.offset(1), 0b1);
+        //#endregion
+
         println!("hello!");
-        let dev_tree = fdt::Fdt::from_ptr(fdt_ptr).unwrap();
         println!("Hello, World");
         println!("cpu count: {:?}", dev_tree.cpus().count());
         panic!("reached end of program")
