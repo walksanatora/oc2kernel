@@ -2,7 +2,7 @@ OUTPUT_ARCH("riscv64")
 ENTRY(_start)
 
 MEMORY {
-  ram   (wxa) : ORIGIN = 0x80000000, LENGTH = 128M
+  ram   (wxa) : ORIGIN = 0x80200000, LENGTH = 128M
 }
 
 PHDRS {
@@ -36,5 +36,6 @@ SECTIONS {
   } >ram AT>ram :bss # and this goes into the bss segment
   . = ALIGN(16); # our stack needs to be 16-byte aligned, per the C calling convention
     PROVIDE(_init_stack_top = . + 0x1000); # reserve 0x1000 bytes for the initialisation stack
+    PROVIDE(end = .);
 }
 

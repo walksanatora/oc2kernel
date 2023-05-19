@@ -1,3 +1,4 @@
 /target
 oc2kernel
 kernel.bin
+fw_jump.bin
