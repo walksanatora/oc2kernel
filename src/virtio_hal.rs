@@ -9,9 +9,9 @@ extern "C" {
     fn end();
 }
 /// a bitfield representing which pages have not been allocated
-static OPEN_PAGES: AtomicU64 = AtomicU64::new(0);
+pub static OPEN_PAGES: AtomicU64 = AtomicU64::new(0);
 /// the number of allocated pages
-static ALLOC_PAGES: AtomicU8 = AtomicU8::new(0);
+pub static ALLOC_PAGES: AtomicU8 = AtomicU8::new(0);
 
 ///currently no special init needs to be done (used to have to init a pointer to the end symbol above)
 pub fn init_virtio_hal() {}
@@ -74,7 +74,6 @@ unsafe impl Hal for HalImpl {
         let block_offset = find_open_pages(pages);
         let dma_block = (end as usize) + (PAGE_SIZE * block_offset);
         ALLOC_PAGES.fetch_add(pages as u8, Ordering::Relaxed);
-        println!("alloc DMA: paddr={:#x}, pages={}", dma_block, pages);
         let vaddr = NonNull::new(dma_block as _).unwrap();
         (dma_block, vaddr)
     }
