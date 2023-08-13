@@ -7,7 +7,10 @@ edition = "2021"
 
 [dependencies]
 fdt = { version = "0.1.5", features = ["pretty-printing"] }
-once_cell = { version = "1.17.1", default-features = false, features = ["alloc","race"] }
+once_cell = { version = "1.17.1", default-features = false, features = [
+    "alloc",
+    "race",
+] }
 simple-chunk-allocator = "0.1.5"
 uart_16550 = "0.2.18"
-virtio-drivers = "0.4.0"
+virtio-drivers = "0.6.0"

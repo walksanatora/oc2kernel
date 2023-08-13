@@ -102,20 +102,7 @@ extern "C" fn entry(_hard_id: u64, fdt_ptr: *const u8) -> ! {
                 }
             }
         }
-
-        //let virtio = dev_tree.all_nodes().filter(|node| {
-        //    if let Some(compat) = node.compatible() {
-        //        compat.all().filter(|i| i == &"virtio").count() > 0
-        //    } else {
-        //        false
-        //    }
-        //});
-        //
-        //println!(
-        //    //number of virtio devices
-        //    "virtio devs: {}",
-        //    virtio.count()
-        //);
+        //get Virtio block device
         let vio_blk = dev_tree
             .find_compatible(&["virtio,mmio"])
             .expect("wheres a disk drive");
@@ -123,17 +110,33 @@ extern "C" fn entry(_hard_id: u64, fdt_ptr: *const u8) -> ! {
             vio_blk.reg().unwrap().next().unwrap().starting_address as *mut VirtIOHeader,
         )
         .unwrap();
+        //create a virtio transport
         let vio_trans = MmioTransport::new(vio_hdr).unwrap();
         println!("ttdt: {:?}", vio_trans.device_type());
+        //turn it into a block
         let mut vio_block = VirtIOBlk::<HalImpl, _>::new(vio_trans).expect("not a block");
+        //get more info
         println!("pages: {:?}", vio_block.capacity());
         println!("Read Only: {}", vio_block.readonly());
+        //HERE WE GO
         let mut hi_bytes: [u8; SECTOR_SIZE] = [0u8; SECTOR_SIZE];
-        hi_bytes[..12].copy_from_slice(b"Hello World!");
-        let resp = vio_block.write_block(1, &hi_bytes);
-        if let Err(e) = resp {
-            println!("failed write: {:#?}", e)
+        hi_bytes[..12].copy_from_slice(b"Hello World?");
+        let mut req = BlkReq::default();
+        let mut resp = BlkResp::default();
+        let token = match vio_block.write_blocks_nb(1, &mut req, &hi_bytes, &mut resp) {
+            Ok(token) => token,
+            Err(e) => {
+                panic!("failed to request write: {}", e)
+            }
+        };
+        loop {
+            if vio_block.ack_interrupt() {
+                break;
+            }
+            spin_loop()
         }
+        let complete = vio_block.complete_write_blocks(token, &req, &hi_bytes, &mut resp);
+        println!("{:?}", complete);
         panic!("Temp End!");
         let mut _blk = None;
         for virt in dev_tree.all_nodes().filter(|node| {
@@ -175,7 +178,7 @@ extern "C" fn entry(_hard_id: u64, fdt_ptr: *const u8) -> ! {
                 let mut req = BlkReq::default();
                 let mut resp = BlkResp::default();
                 let token = ublk
-                    .write_block_nb(0, &mut req, &hi_bytes, &mut resp)
+                    .write_blocks_nb(0, &mut req, &hi_bytes, &mut resp)
                     .unwrap();
                 println!("token is: {}", token);
                 loop {
@@ -186,7 +189,7 @@ extern "C" fn entry(_hard_id: u64, fdt_ptr: *const u8) -> ! {
                 }
                 println!(
                     "complete write {:?}",
-                    ublk.complete_write_block(token, &req, &hi_bytes, &mut resp)
+                    ublk.complete_write_blocks(token, &req, &hi_bytes, &mut resp)
                 );
 
                 break;

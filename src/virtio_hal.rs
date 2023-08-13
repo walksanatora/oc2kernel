@@ -82,6 +82,7 @@ unsafe impl Hal for HalImpl {
         let offset = (paddr - (end as usize)) / PAGE_SIZE;
         let negate = !(generate_mask(pages) >> offset);
         OPEN_PAGES.fetch_and(negate, Ordering::Relaxed);
+        ALLOC_PAGES.fetch_sub(pages as u8, Ordering::Relaxed);
         zero_out_memory(paddr as *mut u8, pages * PAGE_SIZE);
         println!("dealloc DMA: paddr={:#x}, pages={}", paddr, pages);
         0
