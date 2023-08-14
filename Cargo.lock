@@ -65,6 +65,7 @@ name = "oc2kernel"
 version = "0.1.0"
 dependencies = [
  "fdt",
+ "log",
  "once_cell",
  "simple-chunk-allocator",
  "uart_16550",

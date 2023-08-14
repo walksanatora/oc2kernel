@@ -18,7 +18,7 @@ pub fn init_virtio_hal() {}
 
 ///generate a mask with the left-most bits being set to 1
 fn generate_mask(n: usize) -> u64 {
-    assert!(n <= 64, "n must be less than or equal to 64");
+    assert!(n <= 64, "gen_mask: n must be less than or equal to 64");
     if n == 0 {
         0
     } else {
@@ -31,9 +31,8 @@ pub fn find_open_pages(pages: usize) -> usize {
     let pages_bitfield = OPEN_PAGES.load(Ordering::Relaxed);
     if (pages > 64) || (ALLOC_PAGES.load(Ordering::Relaxed) >= 64) {
         panic!(
-            "why are more than 64 pages being allocated {}, pagespace: {:64b}",
+            "why are more than 64 pages being allocated {}",
             if pages > 64 { "at once" } else { "" },
-            pages_bitfield
         )
     }
     let mask = generate_mask(pages);
@@ -43,7 +42,8 @@ pub fn find_open_pages(pages: usize) -> usize {
         let omask = mask >> off;
         if (pages_bitfield & omask) == 0 {
             found = true;
-            offset = off
+            offset = off;
+            break;
         }
     }
     if !found {
@@ -74,11 +74,24 @@ unsafe impl Hal for HalImpl {
         let block_offset = find_open_pages(pages);
         let dma_block = (end as usize) + (PAGE_SIZE * block_offset);
         ALLOC_PAGES.fetch_add(pages as u8, Ordering::Relaxed);
+        OPEN_PAGES.fetch_or(generate_mask(pages) >> block_offset, Ordering::Relaxed);
         let vaddr = NonNull::new(dma_block as _).unwrap();
+        #[cfg(debug_assertions)]
+        println!(
+            "alloc@{}?{}: {:064b}",
+            block_offset,
+            pages,
+            OPEN_PAGES.load(Ordering::Relaxed)
+        );
+        println!(
+            "{} + ({} * {}) = {}",
+            end as usize, PAGE_SIZE, block_offset, dma_block
+        );
         (dma_block, vaddr)
     }
 
     unsafe fn dma_dealloc(paddr: PhysAddr, _vaddr: NonNull<u8>, pages: usize) -> i32 {
+        println!("dealloc");
         let offset = (paddr - (end as usize)) / PAGE_SIZE;
         let negate = !(generate_mask(pages) >> offset);
         OPEN_PAGES.fetch_and(negate, Ordering::Relaxed);

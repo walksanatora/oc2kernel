@@ -6,6 +6,7 @@
 
 //allocator so that we can use alloc variables
 use simple_chunk_allocator::{heap, heap_bitmap, GlobalChunkAllocator, PageAligned};
+use uart::UartLogger;
 use virtio_drivers::{
     device::blk::{BlkReq, BlkResp, VirtIOBlk, SECTOR_SIZE},
     transport::{
@@ -23,7 +24,7 @@ static ALLOCATOR: GlobalChunkAllocator =
 // once cell? (probally should)
 static mut UART_BASE: *mut u8 = 0x1000_0148 as *mut u8;
 static mut DEVICE_TREE_PTR: *const u8 = 0x0 as *const u8;
-
+static LOGGER: UartLogger = UartLogger {};
 //imports
 //basic rust things
 extern crate alloc;
@@ -69,6 +70,8 @@ unsafe extern "C" fn _start() -> ! {
 /// now we can start cooking, our real code exist here
 extern "C" fn entry(_hard_id: u64, fdt_ptr: *const u8) -> ! {
     unsafe {
+        let _ = log::set_logger(&LOGGER);
+        log::set_max_level(log::LevelFilter::Trace);
         //init the virtio hal as `lazy_static` doesen't exist
         virtio_hal::init_virtio_hal();
 
@@ -102,42 +105,34 @@ extern "C" fn entry(_hard_id: u64, fdt_ptr: *const u8) -> ! {
                 }
             }
         }
+        println!("getting vio blk");
         //get Virtio block device
         let vio_blk = dev_tree
             .find_compatible(&["virtio,mmio"])
             .expect("wheres a disk drive");
+        println!("vio header");
         let vio_hdr = NonNull::new(
             vio_blk.reg().unwrap().next().unwrap().starting_address as *mut VirtIOHeader,
         )
         .unwrap();
+        println!("creating transport");
         //create a virtio transport
         let vio_trans = MmioTransport::new(vio_hdr).unwrap();
         println!("ttdt: {:?}", vio_trans.device_type());
         //turn it into a block
+        println!("casting to block");
         let mut vio_block = VirtIOBlk::<HalImpl, _>::new(vio_trans).expect("not a block");
+        println!("casted");
         //get more info
         println!("pages: {:?}", vio_block.capacity());
         println!("Read Only: {}", vio_block.readonly());
         //HERE WE GO
         let mut hi_bytes: [u8; SECTOR_SIZE] = [0u8; SECTOR_SIZE];
         hi_bytes[..12].copy_from_slice(b"Hello World?");
-        let mut req = BlkReq::default();
-        let mut resp = BlkResp::default();
-        let token = match vio_block.write_blocks_nb(1, &mut req, &hi_bytes, &mut resp) {
-            Ok(token) => token,
-            Err(e) => {
-                panic!("failed to request write: {}", e)
-            }
-        };
-        loop {
-            if vio_block.ack_interrupt() {
-                break;
-            }
-            spin_loop()
-        }
-        let complete = vio_block.complete_write_blocks(token, &req, &hi_bytes, &mut resp);
-        println!("{:?}", complete);
-        panic!("Temp End!");
+        vio_block
+            .write_blocks(1, &hi_bytes)
+            .expect("failed to write");
+        panic!("Temp End!!");
         let mut _blk = None;
         for virt in dev_tree.all_nodes().filter(|node| {
             if let Some(compat) = node.compatible() {

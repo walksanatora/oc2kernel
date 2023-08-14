@@ -3,10 +3,14 @@ name = "oc2kernel"
 version = "0.1.0"
 edition = "2021"
 
+[build]
+target = "riscv64imac-unknown-none-elf"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 fdt = { version = "0.1.5", features = ["pretty-printing"] }
+log = "0.4.20"
 once_cell = { version = "1.17.1", default-features = false, features = [
     "alloc",
     "race",

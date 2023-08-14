@@ -53,3 +53,17 @@ pub fn print_fmt(args: core::fmt::Arguments) {
         let _ = (MmioSerialWithXPos { ser: term }).write_fmt(args);
     }
 }
+
+pub struct UartLogger {}
+
+impl log::Log for UartLogger {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &log::Record) {
+        println!("{}", record.args())
+    }
+
+    fn flush(&self) {}
+}
