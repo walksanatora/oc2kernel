@@ -347,6 +347,5 @@ fn on_panic(info: &PanicInfo) -> ! {
 
 mod bar32alloc;
 mod plic;
-mod stolen_uart;
 mod uart;
 mod virtio_hal;

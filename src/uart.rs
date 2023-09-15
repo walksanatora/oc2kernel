@@ -1,5 +1,5 @@
 use core::fmt::Write;
-use crate::stolen_uart::MmioSerialPort;
+use uart_16550::MmioSerialPort;
 
 pub static mut TERM: Option<MmioSerialPort> = None;
 static mut X_POS: u8 = 0;
