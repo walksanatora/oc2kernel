@@ -3,8 +3,12 @@ name = "oc2kernel"
 version = "0.1.0"
 edition = "2021"
 
-[build]
-target = "riscv64imac-unknown-none-elf"
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+debug = true
+opt-level = 2
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,5 +20,9 @@ once_cell = { version = "1.17.1", default-features = false, features = [
     "race",
 ] }
 simple-chunk-allocator = "0.1.5"
-uart_16550 = "0.2.18"
+uart_16550 = "0.3.0"
 virtio-drivers = "0.6.0"
+talc = "2.2.2"
+spin = "0.9.8"
+bitflags = "2.4.0"
+rustversion = "1.0.14"

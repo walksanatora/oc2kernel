@@ -68,7 +68,6 @@ unsafe fn zero_out_memory(ptr: *mut u8, count: usize) {
 }
 
 pub struct HalImpl;
-//TODO: make it so on page dealloc it allows it to be re-allocated instead of just slowly creeping to the right (and possibly causing UB as it creeps into mmio)
 unsafe impl Hal for HalImpl {
     fn dma_alloc(pages: usize, _direction: BufferDirection) -> (PhysAddr, NonNull<u8>) {
         let block_offset = find_open_pages(pages);
@@ -77,26 +76,34 @@ unsafe impl Hal for HalImpl {
         OPEN_PAGES.fetch_or(generate_mask(pages) >> block_offset, Ordering::Relaxed);
         let vaddr = NonNull::new(dma_block as _).unwrap();
         #[cfg(debug_assertions)]
-        println!(
-            "alloc@{}?{}: {:064b}",
-            block_offset,
-            pages,
-            OPEN_PAGES.load(Ordering::Relaxed)
-        );
-        println!(
-            "{} + ({} * {}) = {}",
-            end as usize, PAGE_SIZE, block_offset, dma_block
-        );
+        {
+            println!(
+                "alloc@{}?{}: {:064b}",
+                block_offset,
+                pages,
+                OPEN_PAGES.load(Ordering::Relaxed)
+            );
+            println!(
+                "{} + ({} * {}) = {:X}",
+                end as usize, PAGE_SIZE, block_offset, dma_block
+            );
+        }
         (dma_block, vaddr)
     }
 
     unsafe fn dma_dealloc(paddr: PhysAddr, _vaddr: NonNull<u8>, pages: usize) -> i32 {
-        println!("dealloc");
-        let offset = (paddr - (end as usize)) / PAGE_SIZE;
-        let negate = !(generate_mask(pages) >> offset);
+        //#[cfg(debug_assertions)]
+        println!("dealloc {} {}", paddr, end as usize);
+        if paddr <= (end as usize) {
+            return 0;
+        }
+        let offset = paddr - (end as usize);
+        let page = offset / PAGE_SIZE;
+        let negate = !(generate_mask(pages) >> page);
         OPEN_PAGES.fetch_and(negate, Ordering::Relaxed);
         ALLOC_PAGES.fetch_sub(pages as u8, Ordering::Relaxed);
         zero_out_memory(paddr as *mut u8, pages * PAGE_SIZE);
+        #[cfg(debug_assertions)]
         println!("dealloc DMA: paddr={:#x}, pages={}", paddr, pages);
         0
     }
