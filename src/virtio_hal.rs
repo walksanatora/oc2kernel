@@ -75,7 +75,7 @@ unsafe impl Hal for HalImpl {
         ALLOC_PAGES.fetch_add(pages as u8, Ordering::Relaxed);
         OPEN_PAGES.fetch_or(generate_mask(pages) >> block_offset, Ordering::Relaxed);
         let vaddr = NonNull::new(dma_block as _).unwrap();
-        #[cfg(debug_assertions)]
+        #[cfg(not(feature = "no_log"))]
         {
             println!(
                 "alloc@{}?{}: {:064b}",

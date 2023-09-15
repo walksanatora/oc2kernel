@@ -9,6 +9,7 @@
 
 use alloc::format;
 use bar32alloc::PciMemory32Allocator;
+use core::arch::asm;
 use log::*;
 use uart::UartLogger;
 use virtio_drivers::{
@@ -63,7 +64,6 @@ use core::{panic::PanicInfo, ptr::NonNull, sync::atomic::Ordering};
 #[no_mangle]
 #[link_section = ".text.init"]
 unsafe extern "C" fn _start() -> ! {
-    use core::arch::asm;
     asm!(
         // before we use the `la` pseudo-instruction for the first time,
         //  we need to set `gp` (google linker relaxation)
@@ -166,8 +166,8 @@ where
 extern "C" fn entry(_hard_id: u64, fdt_ptr: *const u8) -> ! {
     unsafe {
         let _ = log::set_logger(&LOGGER);
-        if true {
-            log::set_max_level(log::LevelFilter::Trace);
+        if cfg!(feature = "no_log") {
+            log::set_max_level(log::LevelFilter::Info);
         } else {
             log::set_max_level(log::LevelFilter::Warn);
         }
@@ -209,7 +209,7 @@ extern "C" fn entry(_hard_id: u64, fdt_ptr: *const u8) -> ! {
         let pci_addr = pci_node.reg().unwrap().next().unwrap().starting_address;
         let mut pci = PciRoot::new(pci_addr as *mut u8, Cam::Ecam);
         let mut allocator = PciMemory32Allocator::for_pci_ranges(&pci_node);
-        #[allow(unused_mut,unused_variables)]
+        #[allow(unused_mut, unused_variables)]
         let mut console: Option<VirtIOConsole<HalImpl, PciTransport>> = {
             let mut ret = None;
             for a in 0..255 {
@@ -272,7 +272,7 @@ extern "C" fn entry(_hard_id: u64, fdt_ptr: *const u8) -> ! {
                 .unwrap()
                 .starting_address
                 .offset(8) as *const u32;
-            println!("virt: {} d:{}", virt.name,*device);
+            println!("virt: {} d:{}", virt.name, *device);
             if *device == 2 {
                 println!("device type confirmed");
                 //we got ourselfes a storage device
@@ -329,7 +329,7 @@ fn on_panic(info: &PanicInfo) -> ! {
     println!("DMA pages: {:064b}", OPEN_PAGES.load(Ordering::Relaxed));
     println!("Alloc pages: {}", ALLOC_PAGES.load(Ordering::Relaxed));
     loop {
-        //core::hint::spin_loop()
+        unsafe { asm!("wfi") }
     }
 }
 
@@ -341,7 +341,7 @@ fn on_panic(info: &PanicInfo) -> ! {
     println!("Alloc pages: {}", ALLOC_PAGES.load(Ordering::Relaxed));
     //break-here
     loop {
-        //core::hint::spin_loop()
+        unsafe { asm!("wfi") }
     }
 }
 

@@ -6,6 +6,9 @@ edition = "2021"
 [profile.dev]
 opt-level = 0
 
+[features]
+no_log = []
+
 [profile.release]
 debug = true
 opt-level = 2
